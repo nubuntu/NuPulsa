@@ -1,0 +1,105 @@
+<?php
+class ymMobile
+	{
+	function ymLogin($ymdata)
+		{
+		//pisahkan user dan password
+		$ymdata = explode('::', $ymdata);
+		if(count($ymdata)<>2) die("Data ID YM/Password wajib diisikan");
+
+		//lakukan proses dekode
+		$this->id_ym	= $ymdata[0];
+		$this->password_ym = $ymdata[1];
+
+		$xml = $this->phpSend('http://us.m.yahoo.com/w/bp-messenger', '', '', getcwd() . '/cookies_yahoo_messenger.cookie');
+
+		$xmlDoc = new DOMDocument();
+		@$xmlDoc->loadHTML($xml);
+
+		$login_URL = $xmlDoc->getElementsByTagName("form")->item(0)->getAttribute("action");
+
+		foreach ($xmlDoc->getElementsByTagName("input") as $input) 
+			{
+			if($input->getAttribute("name") == "_done") 
+				{
+				$_done = $input->getAttribute("value");
+				}
+			if($input->getAttribute("name") == "_ts") 
+				{
+				$_ts = $input->getAttribute("value");
+				}
+			if($input->getAttribute("name") == "_crumb") 
+				{
+				$_crumb = $input->getAttribute("value");
+				}
+			}
+
+		// lakukan proses login
+		$this->curlData = $this->phpSend($login_URL, "_authurl=auth&_done=" . $_done . "&_sig=&_src=&_ts=" . $_ts . "&_crumb=" . $_crumb . "&_pc=&_send_userhash=0&_partner_ts=&id=" . $this->id_ym . "&password=" . $this->password_ym . "&__submit=Sign+in", getcwd() . '/cookies_yahoo_messenger.cookie', getcwd() . '/cookies_yahoo_messenger.cookie');
+
+		$error = strpos($this->curlData, 'Invalid ID/Password');
+		if($error>0) die("ID Yahoo/Password salah");
+		}
+
+	function kirimPesan($ym_tujuan, $pesan){
+		$stat = false;
+		if(!empty($this->curlData)){
+			$msg_URL = $this->curlData;
+			$msg_URL = substr($this->curlData, strpos($this->curlData, "<a href=\"/w/bp-messenger/sendmessage") + 9);
+			$msg_URL = substr($msg_URL, 0, strpos($msg_URL, "\""));
+			$msg_URL = str_replace("&amp;", "&", $msg_URL);
+			$msg_URL = "http://us.m.yahoo.com" . $msg_URL;
+			
+			//buka alamat pengiriman pesan
+			$xml = $this->phpSend($msg_URL, '', getcwd() . '/cookies_yahoo_messenger.cookie', getcwd() . '/cookies_yahoo_messenger.cookie');
+
+			$xmlDoc = new DOMDocument();
+			@$xmlDoc->loadHTML($xml);
+
+			$sendmsg_URL = $xmlDoc->getElementsByTagName("form")->item(0)->getAttribute("action");
+			$sendmsg_URL = "http://us.m.yahoo.com" . $sendmsg_URL;
+
+			//kirim pesan
+			return $this->phpSend($sendmsg_URL, "id=" . $ym_tujuan . "&message=" . $pesan . "&__submit=Send", getcwd() . '/cookies_yahoo_messenger.cookie', getcwd() . '/cookies_yahoo_messenger.cookie');
+		}else{
+			return false;		
+		}
+	}
+
+	function phpSend($url, $post, $cookie, $cookie2)
+		{
+		if(function_exists("curl_init"))
+			{
+			$curl = curl_init();
+			curl_setopt($curl, CURLOPT_URL, $url);
+			curl_setopt($curl, CURLOPT_FOLLOWLOCATION, 1);
+			curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+			if(!empty($post))
+				{
+				curl_setopt($curl, CURLOPT_POST, 1);
+				curl_setopt($curl, CURLOPT_POSTFIELDS, $post);
+				}
+
+			curl_setopt($curl, CURLOPT_ENCODING, "");
+			curl_setopt($curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.2.6) Gecko/20100625 Firefox/3.6.6");
+
+			if(!empty($cookie))
+				{
+				curl_setopt($curl, CURLOPT_COOKIEFILE, $cookie);
+				}
+
+			if(!empty($cookie2))
+				{
+				curl_setopt($curl, CURLOPT_COOKIEJAR, $cookie2);
+				}
+
+			$curlData = curl_exec($curl);
+			curl_close($curl);
+
+			return $curlData;
+			}
+			else die("cURL not active");		
+		}
+
+}
+?>
